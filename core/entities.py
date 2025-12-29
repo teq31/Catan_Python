@@ -9,6 +9,7 @@ class HexTile:
         self.number_token = number_token
         self.is_highlighted = False
         self.pixel_x, self.pixel_y = self._calculate_pixel_center()
+        self.has_robber = False
 
     def _calculate_pixel_center(self):
         size = config.HEX_RADIUS
