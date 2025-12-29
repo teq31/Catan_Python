@@ -24,7 +24,7 @@ This project simulates the core mechanics of the game, including board generatio
 
 ## 🛠️ Tech Stack
 
-* **Language:** Python 3.x
+* **Language:** Python 3.12.8
 * **Library:** Pygame (for rendering and input handling)
 
 ## 🎮 Controls
