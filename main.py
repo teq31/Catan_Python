@@ -15,7 +15,7 @@ class Game:
     def __init__(self):
         pygame.init()
         self.screen = pygame.display.set_mode((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
-        pygame.display.set_caption("Catan - Modular Pro Architecture")
+        pygame.display.set_caption("Catan - 4 Players Mode")
         self.clock = pygame.time.Clock()
         self.running = True
 
@@ -23,8 +23,11 @@ class Game:
         self.board.generate_random_board()
 
         p1 = Player("Human (Red)", (255, 50, 50), is_ai=False)
-        p2 = Player("AI (Blue)", (50, 50, 255), is_ai=True)
-        self.players = [p1, p2]
+        p2 = Player("AI 1 (Blue)", (50, 50, 255), is_ai=True)
+        p3 = Player("AI 2 (Green)", (34, 139, 34), is_ai=True)
+        p4 = Player("AI 3 (Orange)", (255, 140, 0), is_ai=True)
+
+        self.players = [p1, p2, p3, p4]
 
         self.renderer = BoardRenderer(self.screen)
         self.ai_brain = AIController(self)
@@ -33,8 +36,10 @@ class Game:
         self.storage_manager = StorageManager(self)
 
         self.game_phase = 'SETUP'
+
         num_players = len(self.players)
         self.setup_order = list(range(num_players)) + list(range(num_players - 1, -1, -1))
+
         self.setup_step_idx = 0
         self.setup_subphase = 'SETTLEMENT'
 
@@ -43,6 +48,11 @@ class Game:
 
         self.interaction_mode = 'view'
         self.trade_offer = None
+
+        self.p2p_offer = {'give': {}, 'get': {}}
+        self.p2p_active_side = 'give'
+        self.p2p_target_idx = 0
+
         self.last_dice_roll = 0
         self.dice_rolled_this_turn = False
         self.yop_selected_resources = []
@@ -97,7 +107,8 @@ class Game:
                                                                                         my); self.hovered_vertex = v if v else None
                     if self.setup_subphase == 'ROAD': e = tile.get_nearest_edge(mx,
                                                                                 my); self.hovered_edge = e if e else None
-                elif self.interaction_mode not in ['move_robber', 'trade', 'monopoly', 'year_of_plenty']:
+                elif self.interaction_mode not in ['move_robber', 'trade', 'monopoly', 'year_of_plenty', 'p2p_trade',
+                                                   'p2p_confirm']:
                     if self.interaction_mode in ['build_settlement', 'build_city', 'view']: v = tile.get_nearest_vertex(
                         mx, my); self.hovered_vertex = v if v else None
                     if self.interaction_mode in ['build_road', 'view']: e = tile.get_nearest_edge(mx,
@@ -128,6 +139,10 @@ class Game:
         if self.game_phase == 'MAIN':
             if self.interaction_mode == 'trade':
                 self.renderer.draw_trade_menu(self.trade_offer, self.get_current_player())
+            elif self.interaction_mode == 'p2p_trade':
+                self.renderer.draw_p2p_menu(self)
+            elif self.interaction_mode == 'p2p_confirm':
+                self.renderer.draw_p2p_confirm(self)
             elif self.interaction_mode == 'monopoly':
                 self.renderer.draw_monopoly_menu()
             elif self.interaction_mode == 'year_of_plenty':

@@ -1,3 +1,4 @@
+import os
 SCREEN_WIDTH = 1200
 SCREEN_HEIGHT = 800
 FPS = 60
@@ -6,23 +7,24 @@ CAPTION = "Catan Board Generator"
 HEX_RADIUS = 60
 
 BG_COLOR = (65, 105, 225)
-
-COLOR_WOOD = (34, 139, 34)
-COLOR_BRICK = (178, 34, 34)
-COLOR_SHEEP = (144, 238, 144)
-COLOR_WHEAT = (255, 215, 0)
-COLOR_ORE = (112, 128, 144)
-COLOR_DESERT = (244, 164, 96)
+COLOR_LINE = (0, 0, 0)
+COLOR_TOKEN = (240, 230, 200)
+COLOR_TEXT = (0, 0, 0)
 
 RESOURCE_COLORS = {
-    'wood': COLOR_WOOD,
-    'brick': COLOR_BRICK,
-    'sheep': COLOR_SHEEP,
-    'wheat': COLOR_WHEAT,
-    'ore': COLOR_ORE,
-    'desert': COLOR_DESERT
+    'wood': (34, 139, 34),
+    'brick': (178, 34, 34),
+    'sheep': (144, 238, 144),
+    'wheat': (255, 215, 0),
+    'ore': (112, 128, 144),
+    'desert': (244, 164, 96)
 }
 
-COLOR_LINE = (0, 0, 0)
-COLOR_TEXT = (0, 0, 0)
-COLOR_TOKEN = (255, 250, 240)
+RESOURCE_IMAGES = {
+    'wood': 'assets/wood.png',
+    'brick': 'assets/brick.png',
+    'sheep': 'assets/sheep.png',
+    'wheat': 'assets/wheat.png',
+    'ore': 'assets/ore.png',
+    'desert': 'assets/desert.png'
+}

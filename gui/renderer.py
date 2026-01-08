@@ -1,14 +1,33 @@
 import pygame
+import math
+import os
 import config
 
 
 class BoardRenderer:
     def __init__(self, screen):
         self.screen = screen
-        self.font = pygame.font.SysFont('Arial', 22, bold=True)
+        self.font = pygame.font.SysFont('Arial', 20, bold=True)
         self.ui_font = pygame.font.SysFont('Arial', 18)
         self.title_font = pygame.font.SysFont('Arial', 28, bold=True)
         self.port_font = pygame.font.SysFont('Arial', 16, bold=True)
+
+        self.resource_images = {}
+        self._load_images()
+
+    def _load_images(self):
+        target_width = int(math.sqrt(3) * config.HEX_RADIUS) + 2
+        target_height = int(2 * config.HEX_RADIUS) + 2
+
+        if hasattr(config, 'RESOURCE_IMAGES'):
+            for res_type, file_path in config.RESOURCE_IMAGES.items():
+                if os.path.exists(file_path):
+                    try:
+                        img = pygame.image.load(file_path).convert_alpha()
+                        img = pygame.transform.smoothscale(img, (target_width, target_height))
+                        self.resource_images[res_type] = img
+                    except Exception:
+                        pass
 
     def draw_board(self, board, hovered_vertex=None, hovered_edge=None):
         self.screen.fill((60, 100, 200))
@@ -39,6 +58,30 @@ class BoardRenderer:
         if hovered_edge: self.draw_hovered_edge(hovered_edge)
         if hovered_vertex: self.draw_hovered_vertex(hovered_vertex)
 
+    def draw_hex_tile(self, tile):
+        points = tile.get_vertices()
+
+        if tile.resource_type in self.resource_images:
+            img = self.resource_images[tile.resource_type]
+            rect = img.get_rect(center=(tile.pixel_x, tile.pixel_y))
+            self.screen.blit(img, rect)
+        else:
+            color = config.RESOURCE_COLORS.get(tile.resource_type, (100, 100, 100))
+            pygame.draw.polygon(self.screen, color, points)
+
+        pygame.draw.polygon(self.screen, (50, 50, 50), points, 2)
+
+        if tile.is_highlighted:
+            pygame.draw.polygon(self.screen, (255, 255, 255), points, 4)
+
+        if tile.has_robber:
+            cx, cy = int(tile.pixel_x), int(tile.pixel_y)
+            pygame.draw.circle(self.screen, (30, 30, 30), (cx, cy), 20)
+            pygame.draw.circle(self.screen, (200, 50, 50), (cx, cy), 20, 3)
+            self.screen.blit(self.font.render("!", True, (255, 255, 255)), (cx - 4, cy - 12))
+        elif tile.number_token is not None:
+            self.draw_number_token(tile.pixel_x, tile.pixel_y, tile.number_token)
+
     def draw_ports(self, board):
         for port in board.ports:
             p1, p2 = port['edge']
@@ -47,12 +90,12 @@ class BoardRenderer:
             mid_x = (p1[0] + p2[0]) / 2
             mid_y = (p1[1] + p2[1]) / 2
 
-            pygame.draw.line(self.screen, (101, 67, 33), p1, (mid_x, mid_y), width=6)  # Dark Brown
+            pygame.draw.line(self.screen, (101, 67, 33), p1, (mid_x, mid_y), width=6)
             pygame.draw.line(self.screen, (101, 67, 33), p2, (mid_x, mid_y), width=6)
 
             bg_color = (240, 240, 240) if res_type == '3:1' else (255, 255, 255)
-            pygame.draw.circle(self.screen, (0, 0, 0), (int(mid_x), int(mid_y)), 20)  # Contur negru
-            pygame.draw.circle(self.screen, bg_color, (int(mid_x), int(mid_y)), 18)  # Fundal
+            pygame.draw.circle(self.screen, (0, 0, 0), (int(mid_x), int(mid_y)), 20)
+            pygame.draw.circle(self.screen, bg_color, (int(mid_x), int(mid_y)), 18)
 
             if res_type != '3:1':
                 res_col = config.RESOURCE_COLORS.get(res_type, (150, 150, 150))
@@ -61,7 +104,6 @@ class BoardRenderer:
                 pygame.draw.circle(self.screen, (180, 180, 180), (int(mid_x), int(mid_y)), 14)
 
             label = "?" if res_type == '3:1' else "2:1"
-
             txt_col = (0, 0, 0)
             if res_type in ['brick', 'ore', 'wood'] and res_type != '3:1':
                 txt_col = (255, 255, 255)
@@ -77,9 +119,9 @@ class BoardRenderer:
                 self.screen.blit(ratio_surf, ratio_surf.get_rect(center=(int(mid_x), int(mid_y) + 22)))
 
     def draw_ui(self, player, mode, dice_roll=0):
-        START_X = 20;
-        START_Y = 45;
-        PANEL_WIDTH = 280;
+        START_X = 20
+        START_Y = 50
+        PANEL_WIDTH = 280
         PANEL_HEIGHT = 650
 
         s_shadow = pygame.Surface((PANEL_WIDTH, PANEL_HEIGHT))
@@ -155,9 +197,11 @@ class BoardRenderer:
             self.screen.blit(self.ui_font.render("LARGEST ARMY (+2)", True, (255, 255, 255)),
                              (START_X + 50, cursor_y + 2))
 
-        footer_y = START_Y + PANEL_HEIGHT - 30
-        self.screen.blit(self.ui_font.render("[S]Save [L]Load [T]Trade", True, (100, 100, 100)),
-                         (START_X + 25, footer_y))
+        footer_y = START_Y + PANEL_HEIGHT - 50
+        self.screen.blit(self.ui_font.render("[T] Bank Trade   [P] Player Trade", True, (100, 100, 100)),
+                         (START_X + 15, footer_y))
+        self.screen.blit(self.ui_font.render("[S] Save Game    [L] Load Game", True, (100, 100, 100)),
+                         (START_X + 15, footer_y + 25))
 
     def draw_trade_menu(self, trade_offer, player):
         self._draw_modern_box("BANK / PORT TRADE",
@@ -171,6 +215,109 @@ class BoardRenderer:
 
     def draw_yop_menu(self, count_selected):
         self._draw_modern_box("YEAR OF PLENTY", f"Choose 2 resources FREE.", f"Selected: {count_selected} / 2")
+
+    def draw_p2p_menu(self, game):
+        offer = game.p2p_offer
+        active_side = game.p2p_active_side
+        target_name = game.players[game.p2p_target_idx].name
+
+        W, H = 600, 400;
+        CX, CY = config.SCREEN_WIDTH // 2, config.SCREEN_HEIGHT // 2
+
+        overlay = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
+        overlay.set_alpha(200);
+        overlay.fill((0, 0, 0))
+        self.screen.blit(overlay, (0, 0))
+
+        rect = pygame.Rect(CX - W // 2, CY - H // 2, W, H)
+        pygame.draw.rect(self.screen, (30, 35, 45), rect, 0, 15)
+        pygame.draw.rect(self.screen, (255, 215, 0), rect, 3, 15)
+
+        title = self.title_font.render("PLAYER TRADE PROPOSAL", True, (255, 215, 0))
+        self.screen.blit(title, title.get_rect(center=(CX, CY - 160)))
+
+        target_txt = self.font.render(f"TRADING WITH: {target_name}", True, (50, 200, 255))
+        self.screen.blit(target_txt, target_txt.get_rect(center=(CX, CY - 130)))
+
+        instr = self.ui_font.render("[TAB] Switch Side  |  [SPACE] Change Partner  |  [ENTER] Propose", True,
+                                    (200, 200, 200))
+        self.screen.blit(instr, instr.get_rect(center=(CX, CY + 170)))
+
+        col_give = (100, 255, 100) if active_side == 'give' else (100, 100, 100)
+        pygame.draw.rect(self.screen, col_give, (CX - 250, CY - 100, 220, 220), 2)
+        lbl_give = self.font.render("YOU GIVE", True, col_give)
+        self.screen.blit(lbl_give, (CX - 200, CY - 130))
+
+        y_off = 0
+        for res, amt in offer['give'].items():
+            txt = self.font.render(f"{amt} x {res.upper()}", True, (255, 255, 255))
+            self.screen.blit(txt, (CX - 230, CY - 80 + y_off));
+            y_off += 30
+
+        col_get = (100, 255, 100) if active_side == 'get' else (100, 100, 100)
+        pygame.draw.rect(self.screen, col_get, (CX + 30, CY - 100, 220, 220), 2)
+        lbl_get = self.font.render("YOU WANT", True, col_get)
+        self.screen.blit(lbl_get, (CX + 80, CY - 130))
+
+        y_off = 0
+        for res, amt in offer['get'].items():
+            txt = self.font.render(f"{amt} x {res.upper()}", True, (255, 255, 255))
+            self.screen.blit(txt, (CX + 50, CY - 80 + y_off));
+            y_off += 30
+
+    def draw_p2p_confirm(self, game):
+        target_player = game.players[game.p2p_target_idx]
+        current_player = game.get_current_player()
+
+        W, H = 500, 250;
+        CX, CY = config.SCREEN_WIDTH // 2, config.SCREEN_HEIGHT // 2
+
+        overlay = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
+        overlay.set_alpha(220);
+        overlay.fill((0, 0, 0))
+        self.screen.blit(overlay, (0, 0))
+
+        pygame.draw.rect(self.screen, (50, 0, 0), (CX - W // 2, CY - H // 2, W, H), 0, 20)
+        pygame.draw.rect(self.screen, (255, 0, 0), (CX - W // 2, CY - H // 2, W, H), 4, 20)
+
+        msg1 = self.title_font.render(f"{target_player.name.upper()}!", True, (255, 255, 255))
+        self.screen.blit(msg1, msg1.get_rect(center=(CX, CY - 60)))
+
+        msg2 = self.font.render(f"{current_player.name} offers a trade.", True, (200, 200, 200))
+        self.screen.blit(msg2, msg2.get_rect(center=(CX, CY - 20)))
+
+        msg3 = self.title_font.render("Do you ACCEPT?", True, (255, 215, 0))
+        self.screen.blit(msg3, msg3.get_rect(center=(CX, CY + 30)))
+
+        keys = self.font.render("[Y] YES      [N] NO", True, (255, 255, 255))
+        self.screen.blit(keys, keys.get_rect(center=(CX, CY + 80)))
+
+    def draw_number_token(self, x, y, number):
+        pygame.draw.circle(self.screen, (240, 230, 200), (int(x), int(y)), 18)
+        pygame.draw.circle(self.screen, (0, 0, 0), (int(x), int(y)), 18, 1)
+
+        col = (200, 0, 0) if number in [6, 8] else (0, 0, 0)
+        f = self.font if number in [6, 8] else self.ui_font
+
+        txt = f.render(str(number), True, col)
+        self.screen.blit(txt, txt.get_rect(center=(int(x), int(y))))
+
+    def draw_hovered_vertex(self, vertex):
+        s = pygame.Surface((30, 30), pygame.SRCALPHA)
+        pygame.draw.circle(s, (255, 255, 255, 150), (15, 15), 10)
+        pygame.draw.circle(s, (255, 255, 255, 255), (15, 15), 10, 2)
+        self.screen.blit(s, (vertex[0] - 15, vertex[1] - 15))
+
+    def draw_hovered_edge(self, edge):
+        pygame.draw.line(self.screen, (255, 255, 255), edge[0], edge[1], width=6)
+
+    def draw_winner(self, winner_name):
+        s = pygame.Surface(self.screen.get_size());
+        s.set_alpha(220);
+        s.fill((0, 0, 0));
+        self.screen.blit(s, (0, 0))
+        t = self.title_font.render(f"{winner_name} WINS!", True, (255, 215, 0))
+        self.screen.blit(t, t.get_rect(center=(config.SCREEN_WIDTH // 2, config.SCREEN_HEIGHT // 2)))
 
     def _draw_modern_box(self, title, subtitle, sub2="", player=None, trade_mode=False):
         W, H = 520, 320;
@@ -232,48 +379,3 @@ class BoardRenderer:
 
         esc = self.ui_font.render("Press [ESC] to Cancel", True, (255, 100, 100))
         self.screen.blit(esc, esc.get_rect(center=(CX, CY + 130)))
-
-    def draw_hex_tile(self, tile):
-        points = tile.get_vertices()
-        color = config.RESOURCE_COLORS[tile.resource_type]
-        pygame.draw.polygon(self.screen, color, points)
-
-        pygame.draw.polygon(self.screen, (100, 100, 100), points, 2)
-
-        if tile.is_highlighted:
-            pygame.draw.polygon(self.screen, (255, 255, 255), points, 4)
-
-        if tile.has_robber:
-            cx, cy = int(tile.pixel_x), int(tile.pixel_y)
-            pygame.draw.circle(self.screen, (30, 30, 30), (cx, cy), 20)
-            pygame.draw.circle(self.screen, (200, 50, 50), (cx, cy), 20, 3)
-            self.screen.blit(self.font.render("!", True, (255, 255, 255)), (cx - 4, cy - 12))
-        elif tile.number_token is not None:
-            self.draw_number_token(tile.pixel_x, tile.pixel_y, tile.number_token)
-
-    def draw_number_token(self, x, y, number):
-        pygame.draw.circle(self.screen, (240, 230, 200), (int(x), int(y)), 18)
-        pygame.draw.circle(self.screen, (0, 0, 0), (int(x), int(y)), 18, 1)
-
-        col = (200, 0, 0) if number in [6, 8] else (0, 0, 0)
-        f = self.font if number in [6, 8] else self.ui_font
-
-        txt = f.render(str(number), True, col)
-        self.screen.blit(txt, txt.get_rect(center=(int(x), int(y))))
-
-    def draw_hovered_vertex(self, vertex):
-        s = pygame.Surface((30, 30), pygame.SRCALPHA)
-        pygame.draw.circle(s, (255, 255, 255, 150), (15, 15), 10)
-        pygame.draw.circle(s, (255, 255, 255, 255), (15, 15), 10, 2)
-        self.screen.blit(s, (vertex[0] - 15, vertex[1] - 15))
-
-    def draw_hovered_edge(self, edge):
-        pygame.draw.line(self.screen, (255, 255, 255), edge[0], edge[1], width=6)
-
-    def draw_winner(self, winner_name):
-        s = pygame.Surface(self.screen.get_size());
-        s.set_alpha(220);
-        s.fill((0, 0, 0));
-        self.screen.blit(s, (0, 0))
-        t = self.title_font.render(f"{winner_name} WINS!", True, (255, 215, 0))
-        self.screen.blit(t, t.get_rect(center=(config.SCREEN_WIDTH // 2, config.SCREEN_HEIGHT // 2)))

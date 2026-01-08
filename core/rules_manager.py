@@ -48,7 +48,10 @@ class RulesManager:
             if card_type == 'knight':
                 player.knights_played += 1
                 valid_tiles = [t for t in self.game.board.tiles if not t.has_robber]
-                if valid_tiles: self.game.board.move_robber(random.choice(valid_tiles))
+                if valid_tiles:
+                    target = random.choice(valid_tiles)
+                    self.game.board.move_robber(target)
+                    self.execute_robber_theft(target)
                 self.check_achievements()
             elif card_type == 'year_of_plenty':
                 player.add_resource('wood', 1);
@@ -96,6 +99,42 @@ class RulesManager:
         player.resources[resource_type] += total_stolen
         return total_stolen
 
+    def execute_robber_theft(self, tile):
+        current_player = self.game.get_current_player()
+        potential_victims = self.game.board.get_players_on_tile(tile)
+
+        if current_player in potential_victims:
+            potential_victims.remove(current_player)
+
+        valid_victims = [p for p in potential_victims if sum(p.resources.values()) > 0]
+
+        if not valid_victims:
+            self.game.set_message("Robber moved. No one to steal from!", 2000)
+            return
+
+        victim = random.choice(valid_victims)
+        victim_hand = []
+        for res, count in victim.resources.items():
+            victim_hand.extend([res] * count)
+
+        stolen_res = random.choice(victim_hand)
+        victim.resources[stolen_res] -= 1
+        current_player.resources[stolen_res] += 1
+
+        msg = f"Stole 1 {stolen_res.upper()} from {victim.name}!"
+        self.game.set_message(msg, 3000)
+
+    def execute_p2p_trade(self, p1, p2, give_dict, get_dict):
+        for res, amt in give_dict.items():
+            p1.resources[res] -= amt
+            p2.resources[res] += amt
+
+        for res, amt in get_dict.items():
+            p2.resources[res] -= amt
+            p1.resources[res] += amt
+
+        self.game.set_message(f"Trade successful with {p2.name}!", 2500)
+
     def advance_setup_step(self):
         player = self.game.get_current_player()
 
@@ -108,7 +147,6 @@ class RulesManager:
                 last_settlement = player.settlements[-1]
                 resources = self.game.board.get_resources_from_node(last_settlement)
                 for r in resources: player.add_resource(r, 1)
-                print(f"Starter resources for {player.name}: {resources}")
 
             self.game.setup_step_idx += 1
             if self.game.setup_step_idx >= len(self.game.setup_order):

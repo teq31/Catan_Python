@@ -62,7 +62,7 @@ class InputManager:
             if self.game.interaction_mode == 'move_robber' and selected_hex:
                 self.game.board.move_robber(selected_hex)
                 self.game.interaction_mode = 'view'
-                self.game.set_message("Robber moved!", 1500)
+                self.game.rules_manager.execute_robber_theft(selected_hex)
 
             elif self.game.interaction_mode == 'build_settlement' and hovered_vertex:
                 if player.can_afford('settlement'):
@@ -89,6 +89,73 @@ class InputManager:
                 self._handle_special_keys(event.key, player)
             return
 
+        if self.game.interaction_mode == 'p2p_trade':
+            if event.key == pygame.K_ESCAPE:
+                self.game.interaction_mode = 'view'
+                self._reset_p2p()
+
+            elif event.key == pygame.K_TAB:
+                if self.game.p2p_active_side == 'give':
+                    self.game.p2p_active_side = 'get'
+                else:
+                    self.game.p2p_active_side = 'give'
+
+            elif event.key == pygame.K_SPACE:
+                start_idx = self.game.p2p_target_idx
+                while True:
+                    self.game.p2p_target_idx = (self.game.p2p_target_idx + 1) % len(self.game.players)
+                    if self.game.p2p_target_idx != self.game.current_player_idx:
+                        break
+                    if self.game.p2p_target_idx == start_idx: break
+
+            elif event.key in [pygame.K_w, pygame.K_b, pygame.K_s, pygame.K_g, pygame.K_o]:
+                self._handle_p2p_selection(event.key)
+
+            elif event.key == pygame.K_RETURN:
+                target_player = self.game.players[self.game.p2p_target_idx]
+                give = self.game.p2p_offer['give']
+                get = self.game.p2p_offer['get']
+
+                valid_offer = True
+                for res, amt in give.items():
+                    if player.resources.get(res, 0) < amt: valid_offer = False
+
+                if not valid_offer:
+                    self.game.set_message("You don't have these resources!", 2000)
+                elif not give and not get:
+                    self.game.set_message("Empty offer!", 1000)
+                else:
+                    if target_player.is_ai:
+                        accepted, msg = self.game.ai_brain.evaluate_trade_offer_specific(target_player, give, get)
+                        if accepted:
+                            self.game.rules_manager.execute_p2p_trade(player, target_player, give, get)
+                            self.game.interaction_mode = 'view'
+                            self._reset_p2p()
+                        else:
+                            self.game.set_message(f"{target_player.name} refused.", 2000)
+                    else:
+                        target_valid = True
+                        for res, amt in get.items():
+                            if target_player.resources.get(res, 0) < amt: target_valid = False
+
+                        if not target_valid:
+                            self.game.set_message(f"{target_player.name} can't afford this!", 2000)
+                        else:
+                            self.game.interaction_mode = 'p2p_confirm'
+            return
+
+        if self.game.interaction_mode == 'p2p_confirm':
+            target_player = self.game.players[self.game.p2p_target_idx]
+            if event.key == pygame.K_y:
+                self.game.rules_manager.execute_p2p_trade(player, target_player, self.game.p2p_offer['give'],
+                                                          self.game.p2p_offer['get'])
+                self.game.interaction_mode = 'view'
+                self._reset_p2p()
+            elif event.key == pygame.K_n or event.key == pygame.K_ESCAPE:
+                self.game.interaction_mode = 'p2p_trade'
+                self.game.set_message(f"{target_player.name} declined.", 2000)
+            return
+
         key_map = {
             pygame.K_s: self.game.storage_manager.save_game,
             pygame.K_l: self.game.storage_manager.load_game,
@@ -113,16 +180,15 @@ class InputManager:
                     self.game.set_message(f"Bought: {c.upper()}", 2000)
 
         elif event.key == pygame.K_t:
-            can_trade = any(c >= 4 for c in
-                            player.resources.values())
-            min_ratio = min(player.trade_ratios.values())
-            can_trade = any(c >= min_ratio for c in player.resources.values())
+            # MODIFICARE: Permitem deschiderea meniului indiferent de resurse
+            # Validarea se face cand selectezi resursa in _handle_special_keys
+            self.game.interaction_mode = 'trade'
+            self.game.trade_offer = None
 
-            if can_trade:
-                self.game.interaction_mode = 'trade'
-                self.game.trade_offer = None
-            else:
-                self.game.set_message("Not enough resources to trade!", 2000)
+        elif event.key == pygame.K_p:
+            self.game.interaction_mode = 'p2p_trade'
+            self._reset_p2p()
+            self.game.p2p_target_idx = (self.game.current_player_idx + 1) % len(self.game.players)
 
         elif event.key == pygame.K_r:
             if not self.game.dice_rolled_this_turn:
@@ -176,3 +242,14 @@ class InputManager:
                 self.game.set_message(f"Traded!", 1500)
                 self.game.trade_offer = None
                 self.game.interaction_mode = 'view'
+
+    def _handle_p2p_selection(self, key):
+        res_map = {pygame.K_w: 'wood', pygame.K_b: 'brick', pygame.K_s: 'sheep', pygame.K_g: 'wheat', pygame.K_o: 'ore'}
+        res = res_map[key]
+        side = self.game.p2p_active_side
+        current_dict = self.game.p2p_offer[side]
+        current_dict[res] = current_dict.get(res, 0) + 1
+
+    def _reset_p2p(self):
+        self.game.p2p_offer = {'give': {}, 'get': {}}
+        self.game.p2p_active_side = 'give'

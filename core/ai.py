@@ -24,7 +24,6 @@ class AIController:
                     self.wait(1000)
                     self.game.rules_manager.advance_setup_step()
             else:
-                print("AI ERROR: No settlement spots found!")
                 self.game.rules_manager.advance_setup_step()
 
         elif self.game.setup_subphase == 'ROAD':
@@ -36,7 +35,6 @@ class AIController:
                     self.wait(1000)
                     self.game.rules_manager.advance_setup_step()
             else:
-                print("AI WARNING: No valid road spots found (Math error?). Skipping road.")
                 self.game.set_message("AI skips road (Map Error)", 1000)
                 self.wait(1000)
                 self.game.rules_manager.advance_setup_step()
@@ -80,8 +78,8 @@ class AIController:
         if valid_tiles:
             target = random.choice(valid_tiles)
             self.board.move_robber(target)
-            self.game.set_message(f"AI blocked {target.resource_type.upper()}!", duration=2000)
-            self.wait(2000)
+            self.game.rules_manager.execute_robber_theft(target)
+            self.wait(2500)
 
     def handle_building_logic(self, player):
         if player.can_afford('city'):
@@ -109,3 +107,20 @@ class AIController:
                     self.game.set_message("AI built a ROAD!", duration=1500)
                     self.wait(1500)
                     self.game.rules_manager.check_achievements()
+
+    def evaluate_trade_offer_specific(self, ai_player, offer_give, offer_get):
+        for res, amt in offer_get.items():
+            if ai_player.resources.get(res, 0) < amt:
+                return False, "I don't have those resources."
+
+        count_give = sum(offer_give.values())
+        count_get = sum(offer_get.values())
+
+        ai_needs = [r for r, q in ai_player.resources.items() if q == 0]
+        getting_needed = any(r in ai_needs for r in offer_give)
+
+        if count_give > count_get: return True, "Deal!"
+        if count_give == count_get and getting_needed: return True, "Deal!"
+        if count_give == count_get and random.random() < 0.2: return True, "Ok, fine."
+
+        return False, "No deal."

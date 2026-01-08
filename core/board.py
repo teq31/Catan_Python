@@ -122,8 +122,8 @@ class Board:
 
     def place_settlement(self, node_coords, player, initial_phase=False):
         for existing in list(self.built_settlements.keys()) + list(self.built_cities.keys()):
-            if self._is_near(node_coords, existing, 5): return False  # Ocupat
-            if self._is_near(node_coords, existing, 50): return False  # Prea aproape (regula distanta)
+            if self._is_near(node_coords, existing, 5): return False
+            if self._is_near(node_coords, existing, 50): return False
 
         if not initial_phase:
             connected = False
@@ -204,7 +204,6 @@ class Board:
         for tile in self.tiles:
             for e in tile.get_edges():
                 if self.place_road(e, player):
-                    # Revert
                     if e in self.built_roads: del self.built_roads[e]
                     if e in player.roads: player.roads.remove(e)
                     valid.append(e)
@@ -247,3 +246,19 @@ class Board:
             dfs(start_node, set(), 0)
 
         return max_len
+
+    def get_players_on_tile(self, tile):
+        owners = set()
+        vertices = tile.get_vertices()
+
+        for loc, owner in self.built_settlements.items():
+            for v in vertices:
+                if self._is_near(v, loc):
+                    owners.add(owner)
+
+        for loc, owner in self.built_cities.items():
+            for v in vertices:
+                if self._is_near(v, loc):
+                    owners.add(owner)
+
+        return list(owners)
